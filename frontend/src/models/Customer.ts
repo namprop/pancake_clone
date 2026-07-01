@@ -1,0 +1,58 @@
+import mongoose, { Schema } from "mongoose";
+
+const MessageSchema = new Schema({
+  id: { type: String, required: true },
+  sender: { type: String, enum: ["customer", "shop", "system"], required: true },
+  messageType: { type: String, enum: ["text", "image", "sticker", "audio", "file", "video"], default: "text" },
+  text: { type: String, default: "" },
+  timestamp: { type: Date, default: Date.now },
+  image: { type: String },
+  fileUrl: { type: String },
+  fileName: { type: String },
+  fileType: { type: String },
+  fileSize: { type: Number },
+  isQuickReplyUsed: { type: Boolean, default: false },
+  isPinned: { type: Boolean, default: false },
+  replyTo: {
+    messageId: { type: String },
+    senderName: { type: String },
+    text: { type: String }
+  }
+}, { _id: false });
+
+const CustomerSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true },
+    facebookCustomerId: { type: String, default: "" },
+    pageId: { type: String, default: "" },
+    pageName: { type: String, default: "" },
+    facebookConversationId: { type: String, default: "" },
+    name: { type: String, required: true },
+    avatar: { type: String, default: "" },
+    platform: { type: String, required: true },
+    tags: { type: [String], default: [] },
+    phone: { type: String, default: "" },
+    address: { type: String, default: "" },
+    provinceCode: { type: String, default: "" },
+    districtCode: { type: String, default: "" },
+    wardCode: { type: String, default: "" },
+    lastMessage: { type: String, default: "" },
+    timestamp: { type: Date, default: Date.now },
+    unreadCount: { type: Number, default: 0 },
+    chatHistory: { type: [MessageSchema], default: [] },
+    notes: { type: String, default: "" },
+    gender: { type: String, enum: ["male", "female", "unknown"], default: "male" },
+    birthday: { type: String, default: "" },
+    assigneeName: { type: String, default: "" },
+    assignedAt: { type: Date, default: null },
+    isResolved: { type: Boolean, default: false },
+    resolvedAt: { type: Date, default: null }
+  },
+  { timestamps: true, collection: "customers" }
+);
+
+if (mongoose.models.Customer) {
+  delete mongoose.models.Customer;
+}
+
+export const Customer = mongoose.model("Customer", CustomerSchema);
