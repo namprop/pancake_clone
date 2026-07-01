@@ -206,8 +206,11 @@ export default function FacebookConnectPage() {
             </div>
           ) : (
             <div className="flex h-32 max-w-[640px] flex-col justify-center gap-2 text-xs font-semibold text-slate-500">
-              <span>Chua t?i du?c Fanpage th?t t? Facebook.</span>
-              <span className="font-medium">Ki?m tra backend <code className="rounded bg-slate-100 px-1">FACEBOOK_APP_SECRET</code>, restart backend r?i b?m K?t n?i Facebook l?i.</span>
+              <span>Chua tai duoc Fanpage that tu Facebook.</span>
+              <span className="font-medium">
+                Kiem tra backend <code className="rounded bg-slate-100 px-1">FACEBOOK_APP_SECRET</code>,
+                restart backend roi bam Ket noi Facebook lai.
+              </span>
             </div>
           )}
         </main>
