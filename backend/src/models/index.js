@@ -1,0 +1,16 @@
+module.exports = {
+  ActivityLog: require("./ActivityLog"),
+  AutoReply: require("./AutoReply"),
+  Customer: require("./Customer"),
+  CustomerTag: require("./CustomerTag"),
+  ImageFolder: require("./ImageFolder"),
+  Page: require("./Page"),
+  QuickReply: require("./QuickReply"),
+  QuickReplyTopic: require("./QuickReplyTopic"),
+  Role: require("./Role"),
+  RotationRule: require("./RotationRule"),
+  Tag: require("./Tag"),
+  User: require("./User"),
+  Workspace: require("./Workspace"),
+  WorkspaceSetting: require("./WorkspaceSetting"),
+};

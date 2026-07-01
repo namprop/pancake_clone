@@ -1,6 +1,4 @@
-import { connectDB } from "@/lib/mongodb";
-import { User } from "@/models/User";
-import { getAuthUser, sanitizeUser } from "@/lib/auth";
+import { cookies } from "next/headers";
 import DashboardShell from "@/components/layout/DashboardShell";
 import type { SafeUser } from "@/types/user";
 
@@ -14,15 +12,20 @@ export default async function DashboardLayout({
   let user: SafeUser | null = null;
 
   try {
-    await connectDB();
-    const auth = await getAuthUser();
-    let userDoc = auth ? await User.findById(auth.userId) : null;
-    if (!userDoc || !userDoc.isActive) {
-      // Login is optional, fallback to first active user in DB so user settings function correctly
-      userDoc = await User.findOne({ isActive: true });
-    }
-    if (userDoc) {
-      user = sanitizeUser(userDoc);
+    const cookieStore = await cookies();
+    const cookieHeader = cookieStore
+      .getAll()
+      .map((cookie) => `${cookie.name}=${cookie.value}`)
+      .join("; ");
+    const backendApiUrl = process.env.BACKEND_API_URL ?? "http://localhost:4000";
+    const response = await fetch(`${backendApiUrl}/api/auth/me`, {
+      headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+      cache: "no-store",
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      user = data.user ?? null;
     }
   } catch (error) {
     console.error("DashboardLayout auth fetch error:", error);

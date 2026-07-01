@@ -1,15 +1,14 @@
-import type { Types } from "mongoose";
-
 export type UserRole = "admin" | "manager" | "staff";
+export type ObjectIdLike = string;
 
 export interface IUser {
-  _id: Types.ObjectId;
+  _id: ObjectIdLike;
   fullName: string;
   email: string;
   password: string;
   role: UserRole;
-  workspaceId?: Types.ObjectId;
-  roleId?: Types.ObjectId;
+  workspaceId?: ObjectIdLike;
+  roleId?: ObjectIdLike;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

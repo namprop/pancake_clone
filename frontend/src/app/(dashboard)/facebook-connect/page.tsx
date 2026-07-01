@@ -21,14 +21,6 @@ type PageItem = {
   isActive?: boolean;
 };
 
-const fallbackPages: PageItem[] = [
-  {
-    pageId: "1099824869891873",
-    pageName: "Buôn Bán Niềm Tin",
-    pageAvatar: "/next.svg",
-    isActive: true,
-  },
-];
 
 export default function FacebookConnectPage() {
   const {
@@ -43,8 +35,7 @@ export default function FacebookConnectPage() {
   const [savingPages, setSavingPages] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const hasRealPages = pages.length > 0;
-  const displayPages = (hasRealPages ? pages : fallbackPages) as PageItem[];
+  const displayPages = pages as PageItem[];
 
   useEffect(() => {
     setSelectedPageIds(pages.filter((page) => page.isActive).map((page) => page.pageId));
@@ -64,7 +55,6 @@ export default function FacebookConnectPage() {
   const selectedCount = selectedPageIds.length;
 
   const toggleSelectedPage = (pageId: string) => {
-    if (!hasRealPages) return;
     setSaveSuccess(false);
 
     setSelectedPageIds((current) =>
@@ -75,7 +65,7 @@ export default function FacebookConnectPage() {
   };
 
   const applySelectedPages = async () => {
-    if (!hasRealPages || savingPages) return;
+    if (pages.length === 0 || savingPages) return;
 
     setSavingPages(true);
     try {
@@ -179,7 +169,7 @@ export default function FacebookConnectPage() {
             <Button
               type="button"
               onClick={applySelectedPages}
-              disabled={!hasRealPages || savingPages}
+              disabled={pages.length === 0 || savingPages}
               className="h-[30px] gap-2 rounded-md bg-[#e5e7eb] px-3 text-xs font-bold text-slate-800 shadow-none hover:bg-[#dfe3ea] hover:scale-100 active:scale-100"
             >
               {savingPages ? (
@@ -209,15 +199,15 @@ export default function FacebookConnectPage() {
                 <PageCard
                   key={page.pageId}
                   page={page}
-                  disabled={!hasRealPages}
-                  checked={hasRealPages ? selectedPageIds.includes(page.pageId) : !!page.isActive}
+                  checked={selectedPageIds.includes(page.pageId)}
                   onCheckedChange={() => toggleSelectedPage(page.pageId)}
                 />
               ))}
             </div>
           ) : (
-            <div className="flex h-32 items-center text-xs font-semibold text-slate-500">
-              Không tìm thấy Fanpage phù hợp.
+            <div className="flex h-32 max-w-[640px] flex-col justify-center gap-2 text-xs font-semibold text-slate-500">
+              <span>Chua t?i du?c Fanpage th?t t? Facebook.</span>
+              <span className="font-medium">Ki?m tra backend <code className="rounded bg-slate-100 px-1">FACEBOOK_APP_SECRET</code>, restart backend r?i b?m K?t n?i Facebook l?i.</span>
             </div>
           )}
         </main>
@@ -241,12 +231,10 @@ function CountBadge({ value, active = false }: { value: number; active?: boolean
 function PageCard({
   page,
   checked,
-  disabled,
   onCheckedChange,
 }: {
   page: PageItem;
   checked: boolean;
-  disabled: boolean;
   onCheckedChange: () => void;
 }) {
   return (
@@ -260,10 +248,9 @@ function PageCard({
           type="checkbox"
           className="peer sr-only"
           checked={checked}
-          disabled={disabled}
           onChange={onCheckedChange}
         />
-        <span className="flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border border-slate-300 bg-white text-white transition peer-checked:border-[#1e8ef7] peer-checked:bg-[#1e8ef7] peer-disabled:cursor-default peer-disabled:opacity-60">
+        <span className="flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border border-slate-300 bg-white text-white transition peer-checked:border-[#1e8ef7] peer-checked:bg-[#1e8ef7]">
           <Check className="h-3 w-3" />
         </span>
       </label>
