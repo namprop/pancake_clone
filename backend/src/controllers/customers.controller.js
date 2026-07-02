@@ -6,17 +6,229 @@ function sendError(res, error, status = 500) {
   return res.status(status).json({ success: false, error: error.message || error });
 }
 
+function parseList(value) {
+  if (!value || typeof value !== "string") return [];
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function isTruthy(value) {
+  return value === true || value === "true" || value === "1" || value === "yes";
+}
+
+function addDateRangeFilter(queryParts, from, to) {
+  const range = {};
+  if (from) {
+    const fromDate = new Date(from);
+    if (!Number.isNaN(fromDate.getTime())) {
+      fromDate.setHours(0, 0, 0, 0);
+      range.$gte = fromDate;
+    }
+  }
+
+  if (to) {
+    const toDate = new Date(to);
+    if (!Number.isNaN(toDate.getTime())) {
+      toDate.setHours(23, 59, 59, 999);
+      range.$lte = toDate;
+    }
+  }
+
+  if (Object.keys(range).length > 0) {
+    queryParts.push({ timestamp: range });
+  }
+}
+
+async function getDuplicateCustomerIds(baseQuery) {
+  const groups = await Customer.aggregate([
+    { $match: baseQuery },
+    {
+      $project: {
+        id: 1,
+        duplicateKey: {
+          $cond: [
+            { $and: [{ $ne: ["$phone", ""] }, { $ne: ["$phone", null] }] },
+            { $concat: ["phone:", "$phone"] },
+            {
+              $cond: [
+                {
+                  $and: [
+                    { $ne: ["$facebookCustomerId", ""] },
+                    { $ne: ["$facebookCustomerId", null] },
+                  ],
+                },
+                { $concat: ["fb:", "$facebookCustomerId"] },
+                "",
+              ],
+            },
+          ],
+        },
+      },
+    },
+    { $match: { duplicateKey: { $ne: "" } } },
+    { $group: { _id: "$duplicateKey", ids: { $push: "$id" }, count: { $sum: 1 } } },
+    { $match: { count: { $gt: 1 } } },
+  ]);
+
+  return groups.flatMap((group) => group.ids);
+}
+
 async function listCustomers(req, res) {
   try {
     await connectDB();
     const activePages = await Page.find({ isActive: true }).select("pageId");
     const activePageIds = activePages.map((page) => page.pageId);
-    const customers = await Customer.find({
+
+    const queryParts = [{
       $or: [
         { platform: { $ne: "facebook" } },
         { pageId: { $in: activePageIds } },
       ],
-    }).sort({ timestamp: -1 });
+    }];
+
+    if (req.query.readStatus === "unread") {
+      queryParts.push({ unreadCount: { $gt: 0 } });
+    } else if (req.query.readStatus === "read") {
+      queryParts.push({
+        $or: [
+          { unreadCount: { $lte: 0 } },
+          { unreadCount: { $exists: false } },
+        ],
+      });
+    }
+
+    if (req.query.sourceType === "inbox" || req.query.sourceType === "comment") {
+      queryParts.push({ sourceType: req.query.sourceType });
+    }
+
+    const channels = parseList(req.query.channels || req.query.channel).filter((channel) =>
+      ["inbox", "comment"].includes(channel)
+    );
+    if (channels.length === 1 && channels[0] === "inbox") {
+      queryParts.push({
+        $or: [
+          { sourceType: "inbox" },
+          { sourceType: "" },
+          { sourceType: { $exists: false } },
+        ],
+      });
+    } else if (channels.length === 1 && channels[0] === "comment") {
+      queryParts.push({ sourceType: "comment" });
+    }
+
+    if (req.query.commentFilter && req.query.commentFilter !== "all") {
+      queryParts.push({ sourceType: "comment" });
+
+      if (req.query.commentFilter === "not_messaged") {
+        queryParts.push({
+          $or: [
+            { hasPrivateReply: false },
+            { hasPrivateReply: { $exists: false } },
+          ],
+        });
+      } else if (req.query.commentFilter === "order_marked") {
+        queryParts.push({ isOrderMarked: true });
+      } else if (req.query.commentFilter === "livestream") {
+        queryParts.push({ isFromLivestream: true });
+      } else if (req.query.commentFilter === "not_livestream") {
+        queryParts.push({
+          $or: [
+            { isFromLivestream: false },
+            { isFromLivestream: { $exists: false } },
+          ],
+        });
+      }
+    }
+
+    if (req.query.messageFilter && req.query.messageFilter !== "all") {
+      queryParts.push({
+        $or: [
+          { sourceType: "inbox" },
+          { sourceType: "" },
+          { sourceType: { $exists: false } },
+        ],
+      });
+
+      if (req.query.messageFilter === "handling") {
+        queryParts.push({
+          $or: [
+            { assigneeName: { $exists: true, $nin: ["", null] } },
+            { assignedAt: { $exists: true, $ne: null } },
+          ],
+        });
+      } else if (req.query.messageFilter === "ai_disabled") {
+        queryParts.push({ isAiDisabled: true });
+      } else if (req.query.messageFilter === "ai_forwarded") {
+        queryParts.push({ isAiForwarded: true });
+      }
+    }
+
+    if (req.query.reviewStatus === "has_review") {
+      queryParts.push({ hasReview: true });
+    } else if (req.query.reviewStatus === "no_review") {
+      queryParts.push({
+        $or: [
+          { hasReview: false },
+          { hasReview: { $exists: false } },
+        ],
+      });
+    }
+
+    if (req.query.assigned === "assigned") {
+      queryParts.push({
+        $or: [
+          { assigneeName: { $exists: true, $nin: ["", null] } },
+          { assignedAt: { $exists: true, $ne: null } },
+        ],
+      });
+    } else if (req.query.assigned === "unassigned") {
+      queryParts.push({
+        $and: [
+          { $or: [{ assigneeName: "" }, { assigneeName: null }, { assigneeName: { $exists: false } }] },
+          { $or: [{ assignedAt: null }, { assignedAt: { $exists: false } }] },
+        ],
+      });
+    }
+
+    if (isTruthy(req.query.starred)) {
+      queryParts.push({ isStarred: true });
+    }
+
+    if (req.query.phone === "has") {
+      queryParts.push({ phone: { $regex: "\\d{9,}" } });
+    } else if (req.query.phone === "none") {
+      queryParts.push({
+        $or: [
+          { phone: "" },
+          { phone: null },
+          { phone: { $exists: false } },
+          { phone: { $not: /\d{9,}/ } },
+        ],
+      });
+    }
+
+    if (isTruthy(req.query.unreplied)) {
+      queryParts.push({
+        $or: [{ lastMessageSender: "customer" }, { unreadCount: { $gt: 0 } }],
+      });
+    }
+
+    if (req.query.customerGroup === "new" || req.query.customerGroup === "old") {
+      queryParts.push({ customerGroup: req.query.customerGroup });
+    }
+
+    addDateRangeFilter(queryParts, req.query.from, req.query.to);
+
+    const baseQuery = { $and: queryParts };
+
+    if (isTruthy(req.query.duplicate)) {
+      const duplicateIds = await getDuplicateCustomerIds(baseQuery);
+      queryParts.push({ id: { $in: duplicateIds } });
+    }
+
+    const customers = await Customer.find({ $and: queryParts }).sort({ timestamp: -1 });
 
     return res.json({ success: true, data: customers });
   } catch (error) {
@@ -56,6 +268,18 @@ async function updateCustomer(req, res) {
       "birthday",
       "assigneeName",
       "assignedAt",
+      "sourceType",
+      "lastMessageSender",
+      "isStarred",
+      "customerGroup",
+      "hasPrivateReply",
+      "isOrderMarked",
+      "isFromLivestream",
+      "isAiDisabled",
+      "isAiForwarded",
+      "hasReview",
+      "reviewRating",
+      "reviewText",
       "isResolved",
       "resolvedAt",
       "unreadCount",

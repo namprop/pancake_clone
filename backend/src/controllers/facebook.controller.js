@@ -365,6 +365,7 @@ async function syncFacebook(req, res) {
           fileType: msg.fileType,
           fileSize: msg.fileSize,
         }));
+        const lastSyncedMessage = normalizedChatHistory[normalizedChatHistory.length - 1];
 
         await Customer.findOneAndUpdate(
           { id: conversationKey },
@@ -374,10 +375,13 @@ async function syncFacebook(req, res) {
             pageId: page.pageId,
             pageName: page.pageName,
             facebookConversationId: conversationId,
+            sourceType: "inbox",
             name: customerInfo.name,
             platform: "facebook",
             avatar: `https://graph.facebook.com/v19.0/${customerId}/picture?type=square`,
             lastMessage: snippet,
+            lastMessageSender:
+              lastSyncedMessage?.sender || (unreadCount > 0 ? "customer" : "shop"),
             timestamp: updatedTime,
             unreadCount,
             chatHistory: normalizedChatHistory,
@@ -595,7 +599,9 @@ async function sendMessage(req, res) {
           facebookCustomerId: targetCustomerId,
           pageId: page.pageId,
           pageName: page.pageName,
+          sourceType: "inbox",
           lastMessage: lastMessageText,
+          lastMessageSender: "shop",
           timestamp: new Date(),
           unreadCount: 0,
         },

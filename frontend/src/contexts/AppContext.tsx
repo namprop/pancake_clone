@@ -6,8 +6,17 @@ import React, {
   useState,
   useCallback,
   type ReactNode,
+  type Dispatch,
+  type SetStateAction,
 } from "react";
-import type { Customer, Message, Order, QuickReply, QuickReplyTopic } from "@/types";
+import type {
+  ConversationFilters,
+  Customer,
+  Message,
+  Order,
+  QuickReply,
+  QuickReplyTopic,
+} from "@/types";
 import { INITIAL_CUSTOMERS } from "@/data/mockData";
 import type { SafeUser } from "@/types/user";
 import { notification } from "antd";
@@ -43,6 +52,9 @@ interface AppContextValue {
   setActivePageId: (id: string) => void;
   refreshConnectedPages: () => Promise<void>;
   triggerSync: () => Promise<void>;
+  conversationFilters: ConversationFilters;
+  setConversationFilters: Dispatch<SetStateAction<ConversationFilters>>;
+  resetConversationFilters: () => void;
 }
 
 const DEFAULT_WORKSPACE_SETTINGS = {
@@ -65,6 +77,54 @@ const DEFAULT_WORKSPACE_SETTINGS = {
     staffDetails: "",
   },
 };
+
+const DEFAULT_CONVERSATION_FILTERS: ConversationFilters = {
+  channels: [],
+  assigned: "all",
+  starred: false,
+  readStatus: "all",
+  commentFilter: "all",
+  messageFilter: "all",
+  reviewStatus: "all",
+  phone: "all",
+  unreplied: false,
+  duplicate: false,
+  customerGroup: "all",
+  dateFrom: "",
+  dateTo: "",
+};
+
+function buildCustomerQueryParams(filters: ConversationFilters) {
+  const params = new URLSearchParams();
+
+  if (filters.channels.length > 0) {
+    params.set("channels", filters.channels.join(","));
+  }
+  if (filters.readStatus !== "all") params.set("readStatus", filters.readStatus);
+  if (filters.commentFilter !== "all") {
+    params.set("sourceType", "comment");
+    params.set("commentFilter", filters.commentFilter);
+  }
+  if (filters.messageFilter !== "all") {
+    params.set("sourceType", "inbox");
+    params.set("messageFilter", filters.messageFilter);
+  }
+  if (filters.reviewStatus !== "all") {
+    params.set("reviewStatus", filters.reviewStatus);
+  }
+  if (filters.assigned !== "all") params.set("assigned", filters.assigned);
+  if (filters.starred) params.set("starred", "true");
+  if (filters.phone !== "all") params.set("phone", filters.phone);
+  if (filters.unreplied) params.set("unreplied", "true");
+  if (filters.duplicate) params.set("duplicate", "true");
+  if (filters.customerGroup !== "all") {
+    params.set("customerGroup", filters.customerGroup);
+  }
+  if (filters.dateFrom) params.set("from", filters.dateFrom);
+  if (filters.dateTo) params.set("to", filters.dateTo);
+
+  return params.toString();
+}
 
 const AppContext = createContext<AppContextValue | null>(null);
 
@@ -112,10 +172,14 @@ export function AppProvider({ user, children }: AppProviderProps) {
   const [quickReplyTopics, setQuickReplyTopics] = useState<QuickReplyTopic[]>([]);
   const [connectedPages, setConnectedPages] = useState<any[]>([]);
   const [activePageId, setActivePageId] = useState<string>("");
+  const [conversationFilters, setConversationFilters] = useState<ConversationFilters>(
+    DEFAULT_CONVERSATION_FILTERS
+  );
 
   const refreshCustomers = useCallback(async () => {
     try {
-      const res = await fetch('/api/customers');
+      const query = buildCustomerQueryParams(conversationFilters);
+      const res = await fetch(`/api/customers${query ? `?${query}` : ""}`);
       const json = await res.json();
       if (json.success && json.data && Array.isArray(json.data)) {
         setCustomers(json.data);
@@ -123,6 +187,10 @@ export function AppProvider({ user, children }: AppProviderProps) {
     } catch (err) {
       console.error("Failed to load customers:", err);
     }
+  }, [conversationFilters]);
+
+  const resetConversationFilters = useCallback(() => {
+    setConversationFilters(DEFAULT_CONVERSATION_FILTERS);
   }, []);
 
   const refreshConnectedPages = useCallback(async () => {
@@ -630,6 +698,9 @@ export function AppProvider({ user, children }: AppProviderProps) {
         setActivePageId,
         refreshConnectedPages,
         triggerSync,
+        conversationFilters,
+        setConversationFilters,
+        resetConversationFilters,
         handleTogglePinMessage,
       }}
     >

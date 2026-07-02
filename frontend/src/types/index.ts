@@ -39,6 +39,7 @@ export interface Customer {
   pageId?: string;
   pageName?: string;
   facebookConversationId?: string;
+  sourceType?: "inbox" | "comment";
   name: string;
   avatar: string;
   platform: Platform;
@@ -51,14 +52,59 @@ export interface Customer {
   lastMessage: string;
   timestamp: Date;
   unreadCount: number;
+  lastMessageSender?: "customer" | "shop" | "system";
   chatHistory: Message[];
   notes?: string;
   gender?: "male" | "female" | "unknown";
   birthday?: string | null;
   assigneeName?: string | null;
   assignedAt?: Date | string | null;
+  isStarred?: boolean;
+  customerGroup?: "new" | "old";
+  hasPrivateReply?: boolean;
+  isOrderMarked?: boolean;
+  isFromLivestream?: boolean;
+  isAiDisabled?: boolean;
+  isAiForwarded?: boolean;
+  hasReview?: boolean;
+  reviewRating?: number;
+  reviewText?: string;
   isResolved?: boolean;
   resolvedAt?: Date | string | null;
+}
+
+export type ConversationChannel = "inbox" | "comment";
+export type ConversationPhoneFilter = "all" | "has" | "none";
+export type ConversationAssignedFilter = "all" | "assigned" | "unassigned";
+export type ConversationCustomerGroup = "all" | "new" | "old";
+export type ConversationReadStatus = "all" | "unread" | "read";
+export type ConversationCommentFilter =
+  | "all"
+  | "not_messaged"
+  | "order_marked"
+  | "livestream"
+  | "not_livestream";
+export type ConversationMessageFilter =
+  | "all"
+  | "handling"
+  | "ai_disabled"
+  | "ai_forwarded";
+export type ConversationReviewStatus = "all" | "has_review" | "no_review";
+
+export interface ConversationFilters {
+  channels: ConversationChannel[];
+  assigned: ConversationAssignedFilter;
+  starred: boolean;
+  readStatus: ConversationReadStatus;
+  commentFilter: ConversationCommentFilter;
+  messageFilter: ConversationMessageFilter;
+  reviewStatus: ConversationReviewStatus;
+  phone: ConversationPhoneFilter;
+  unreplied: boolean;
+  duplicate: boolean;
+  customerGroup: ConversationCustomerGroup;
+  dateFrom: string;
+  dateTo: string;
 }
 
 export interface Product {
