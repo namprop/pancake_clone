@@ -34,6 +34,8 @@ export default function ChatList({
     setActiveTagFilters,
     filteredCustomers,
     triggerSync,
+    facebookSyncState,
+    setAutoSyncEnabled,
     workspaceSettings,
   } = useChatList(customers, tags);
 
@@ -89,6 +91,27 @@ export default function ChatList({
       return "";
     }
   };
+  const formatSyncTime = (dateInput: string) => {
+    if (!dateInput) return "";
+    try {
+      return new Date(dateInput).toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+    } catch {
+      return "";
+    }
+  };
+
+  const syncStatusText = facebookSyncState.isSyncing
+    ? "Đang đồng bộ..."
+    : facebookSyncState.lastSyncError
+      ? "Lỗi đồng bộ"
+      : facebookSyncState.lastSyncedAt
+        ? `Lần cuối ${formatSyncTime(facebookSyncState.lastSyncedAt)}`
+        : "Chưa đồng bộ";
+
   return (
     <div className="w-full md:w-[320px] lg:w-[360px] bg-white border-r border-gray-200 flex flex-col h-full shrink-0 select-none shadow-sm z-10">
       {/* Search Header */}
@@ -112,12 +135,43 @@ export default function ChatList({
             Lọc theo
           </button>
           <button
-            onClick={triggerSync}
-            className="flex items-center justify-center w-[34px] h-[34px] bg-sky-50 hover:bg-sky-100 border border-sky-100 rounded-md text-sky-600 transition shrink-0 cursor-pointer"
+            onClick={() => void triggerSync()}
+            disabled={facebookSyncState.isSyncing}
+            className="flex items-center justify-center w-[34px] h-[34px] bg-sky-50 hover:bg-sky-100 border border-sky-100 rounded-md text-sky-600 transition shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
             title="Đồng bộ cuộc hội thoại từ Facebook"
           >
-            <RefreshCw className="w-[15px] h-[15px]" strokeWidth={1.8} />
+            <RefreshCw
+              className={`w-[15px] h-[15px] ${facebookSyncState.isSyncing ? "animate-spin" : ""}`}
+              strokeWidth={1.8}
+            />
           </button>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setAutoSyncEnabled(!facebookSyncState.autoSyncEnabled)}
+            className={`h-[26px] px-2.5 rounded-md text-[12px] font-medium transition flex items-center gap-2 ${
+              facebookSyncState.autoSyncEnabled
+                ? "bg-blue-600 text-white hover:bg-blue-700"
+                : "bg-[#f0f2f5] text-slate-600 hover:bg-[#e4e6eb]"
+            }`}
+            title="Auto sync Facebook every 10 seconds"
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                facebookSyncState.autoSyncEnabled ? "bg-emerald-300" : "bg-slate-400"
+              }`}
+            />
+            Tự đồng bộ
+          </button>
+          <span
+            className={`min-w-0 truncate text-[11px] ${
+              facebookSyncState.lastSyncError ? "text-red-500" : "text-slate-400"
+            }`}
+            title={facebookSyncState.lastSyncError || syncStatusText}
+          >
+            {syncStatusText}
+          </span>
         </div>
       </div>
 

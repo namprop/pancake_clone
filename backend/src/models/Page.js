@@ -11,6 +11,13 @@ const PageSchema = new Schema(
     pageAccessToken: { type: String, required: true },
     tokenExpiresAt: { type: Date },
     isActive: { type: Boolean, default: true },
+    lastSyncedAt: { type: Date },
+    lastSyncStatus: {
+      type: String,
+      enum: ["idle", "running", "success", "error"],
+      default: "idle",
+    },
+    lastSyncError: { type: String, default: "" },
   },
   { timestamps: true, collection: "pages-pancake" }
 );

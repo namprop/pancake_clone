@@ -21,6 +21,14 @@ import { INITIAL_CUSTOMERS } from "@/data/mockData";
 import type { SafeUser } from "@/types/user";
 import { notification } from "antd";
 
+interface FacebookSyncState {
+  isSyncing: boolean;
+  autoSyncEnabled: boolean;
+  lastSyncedAt: string;
+  lastSyncError: string;
+  lastSyncCount: number;
+}
+
 interface AppContextValue {
   user: SafeUser | null;
   customers: Customer[];
@@ -51,7 +59,9 @@ interface AppContextValue {
   activePageId: string;
   setActivePageId: (id: string) => void;
   refreshConnectedPages: () => Promise<void>;
-  triggerSync: () => Promise<void>;
+  triggerSync: (options?: { showNotification?: boolean }) => Promise<boolean>;
+  facebookSyncState: FacebookSyncState;
+  setAutoSyncEnabled: (enabled: boolean) => void;
   conversationFilters: ConversationFilters;
   setConversationFilters: Dispatch<SetStateAction<ConversationFilters>>;
   resetConversationFilters: () => void;
@@ -175,6 +185,14 @@ export function AppProvider({ user, children }: AppProviderProps) {
   const [conversationFilters, setConversationFilters] = useState<ConversationFilters>(
     DEFAULT_CONVERSATION_FILTERS
   );
+  const syncInFlightRef = React.useRef(false);
+  const [facebookSyncState, setFacebookSyncState] = useState<FacebookSyncState>({
+    isSyncing: false,
+    autoSyncEnabled: false,
+    lastSyncedAt: "",
+    lastSyncError: "",
+    lastSyncCount: 0,
+  });
 
   const refreshCustomers = useCallback(async () => {
     try {
@@ -535,7 +553,17 @@ export function AppProvider({ user, children }: AppProviderProps) {
     [activePageId, customers, selectedCustomerId, triggerBotReply]
   );
 
-  const triggerSync = useCallback(async () => {
+  const triggerSync = useCallback(async (options: { showNotification?: boolean } = {}) => {
+    const showNotification = options.showNotification ?? true;
+    if (syncInFlightRef.current) return false;
+
+    syncInFlightRef.current = true;
+    setFacebookSyncState((current) => ({
+      ...current,
+      isSyncing: true,
+      lastSyncError: "",
+    }));
+
     try {
       const res = await fetch("/api/facebook/sync", {
         method: "POST",
@@ -544,22 +572,77 @@ export function AppProvider({ user, children }: AppProviderProps) {
       });
       const json = await res.json();
       if (json.success && json.data) {
+        setFacebookSyncState((current) => ({
+          ...current,
+          lastSyncedAt: json.data.lastSyncedAt || new Date().toISOString(),
+          lastSyncCount: json.data.syncCount || 0,
+          lastSyncError: "",
+        }));
+
+        if (!showNotification) {
+          await refreshCustomers();
+          return true;
+        }
+
         notification.success({
           message: "Đồng bộ thành công",
           description: `Đã đồng bộ ${json.data.syncCount} cuộc hội thoại từ Facebook.`,
         });
 
         await refreshCustomers();
+        return true;
       } else {
+        const errorMessage = json.error || "Cannot sync Facebook messages.";
+        setFacebookSyncState((current) => ({
+          ...current,
+          lastSyncError: errorMessage,
+        }));
+
+        if (!showNotification) {
+          return false;
+        }
+
         notification.error({
           message: "Đồng bộ thất bại",
           description: json.error || "Không thể đồng bộ tin nhắn.",
         });
+        return false;
       }
     } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Failed to sync conversations";
+      setFacebookSyncState((current) => ({
+        ...current,
+        lastSyncError: errorMessage,
+      }));
       console.error("Failed to sync conversations:", e);
+      return false;
+    } finally {
+      syncInFlightRef.current = false;
+      setFacebookSyncState((current) => ({
+        ...current,
+        isSyncing: false,
+      }));
     }
   }, [refreshCustomers]);
+
+  const setAutoSyncEnabled = useCallback((enabled: boolean) => {
+    setFacebookSyncState((current) => ({
+      ...current,
+      autoSyncEnabled: enabled,
+      lastSyncError: enabled ? "" : current.lastSyncError,
+    }));
+  }, []);
+
+  React.useEffect(() => {
+    if (!facebookSyncState.autoSyncEnabled) return;
+
+    void triggerSync({ showNotification: false });
+    const intervalId = window.setInterval(() => {
+      void triggerSync({ showNotification: false });
+    }, 10000);
+
+    return () => window.clearInterval(intervalId);
+  }, [facebookSyncState.autoSyncEnabled, triggerSync]);
 
   const handleUpdateCustomerTags = useCallback(
     (customerId: string, updatedTagIds: string[]) => {
@@ -698,6 +781,8 @@ export function AppProvider({ user, children }: AppProviderProps) {
         setActivePageId,
         refreshConnectedPages,
         triggerSync,
+        facebookSyncState,
+        setAutoSyncEnabled,
         conversationFilters,
         setConversationFilters,
         resetConversationFilters,

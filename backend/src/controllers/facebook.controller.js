@@ -18,6 +18,8 @@ function sendError(res, error, status = 500) {
   return res.status(status).json({ success: false, error: error.message || error });
 }
 
+const runningPageSyncs = new Set();
+
 function frontendUrl(pathname) {
   const origin = process.env.FRONTEND_ORIGIN || "http://localhost:3012";
   return new URL(pathname, origin).toString();
@@ -252,14 +254,24 @@ async function subscribeWebhooks(req, res) {
 }
 
 async function syncFacebook(req, res) {
+  let syncLockKey;
   try {
     await connectDB();
     const { pageId } = req.body || {};
     const pages = await getActivePages(pageId);
+    syncLockKey = pageId || "__all_active_pages__";
 
     if (pages.length === 0) {
       return sendError(res, "Không tìm thấy Page hoạt động để đồng bộ.", 404);
     }
+
+    if (runningPageSyncs.has(syncLockKey)) {
+      return res.status(409).json({
+        success: false,
+        error: "Sync is already running",
+      });
+    }
+    runningPageSyncs.add(syncLockKey);
 
     let syncCount = 0;
     const pageResults = [];
@@ -272,6 +284,7 @@ async function syncFacebook(req, res) {
 
       if (conversationsData.error) {
         if (pageId) {
+          runningPageSyncs.delete(syncLockKey);
           return sendError(res, conversationsData.error.message, 400);
         }
 
@@ -400,12 +413,35 @@ async function syncFacebook(req, res) {
       });
     }
 
+    const lastSyncedAt = new Date();
+    await Page.updateMany(
+      { _id: { $in: pages.map((page) => page._id) } },
+      {
+        $set: {
+          lastSyncedAt,
+          lastSyncStatus: "success",
+          lastSyncError: "",
+        },
+      }
+    );
+    runningPageSyncs.delete(syncLockKey);
+
     return res.json({
       success: true,
-      data: { syncCount, pageCount: pages.length, pageResults },
+      data: {
+        syncCount,
+        pageCount: pages.length,
+        skippedCount: 0,
+        errorCount: pageResults.filter((page) => page.error).length,
+        lastSyncedAt,
+        pageResults,
+      },
     });
   } catch (error) {
     console.error("POST /api/facebook/sync error:", error);
+    if (syncLockKey) {
+      runningPageSyncs.delete(syncLockKey);
+    }
     return sendError(res, error);
   }
 }

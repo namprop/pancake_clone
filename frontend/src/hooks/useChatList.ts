@@ -7,7 +7,7 @@ export function useChatList(customers: Customer[], tags: Tag[]) {
   const [platformFilter, setPlatformFilter] = useState<Platform | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "UNREAD" | "PHONE" | "NO_PHONE" | "NO_TAG">("ALL");
   const [activeTagFilters, setActiveTagFilters] = useState<string[]>([]);
-  const { workspaceSettings, triggerSync } = useAppContext();
+  const { workspaceSettings, triggerSync, facebookSyncState, setAutoSyncEnabled } = useAppContext();
 
   const filteredCustomers = customers.filter((cust) => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -52,6 +52,8 @@ export function useChatList(customers: Customer[], tags: Tag[]) {
     setActiveTagFilters,
     filteredCustomers,
     triggerSync,
+    facebookSyncState,
+    setAutoSyncEnabled,
     workspaceSettings,
   };
 }
