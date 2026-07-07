@@ -17,11 +17,21 @@ const webhookRoutes = require("./routes/webhook.routes");
 
 const app = express();
 
-const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:3012";
+const allowedOrigins = (process.env.FRONTEND_ORIGIN || "http://localhost:3012")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(
   cors({
-    origin: frontendOrigin,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS blocked origin: ${origin}`));
+    },
     credentials: true,
   })
 );
