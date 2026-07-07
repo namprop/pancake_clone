@@ -52,6 +52,7 @@ export interface Customer {
   lastMessage: string;
   timestamp: Date;
   unreadCount: number;
+  lastReadAt?: Date | string | null;
   lastMessageSender?: "customer" | "shop" | "system";
   chatHistory: Message[];
   notes?: string;

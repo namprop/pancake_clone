@@ -379,6 +379,24 @@ async function syncFacebook(req, res) {
           fileSize: msg.fileSize,
         }));
         const lastSyncedMessage = normalizedChatHistory[normalizedChatHistory.length - 1];
+        const lastCustomerMessage = [...normalizedChatHistory]
+          .reverse()
+          .find((message) => message.sender === "customer");
+        const existingCustomer = await Customer.findOne({ id: conversationKey }).select(
+          "lastReadAt"
+        );
+        const lastReadAt = existingCustomer?.lastReadAt
+          ? new Date(existingCustomer.lastReadAt)
+          : null;
+        const lastCustomerMessageAt = lastCustomerMessage?.timestamp
+          ? new Date(lastCustomerMessage.timestamp)
+          : null;
+        const effectiveUnreadCount =
+          lastReadAt &&
+          lastCustomerMessageAt &&
+          lastCustomerMessageAt.getTime() <= lastReadAt.getTime()
+            ? 0
+            : unreadCount;
 
         await Customer.findOneAndUpdate(
           { id: conversationKey },
@@ -394,9 +412,9 @@ async function syncFacebook(req, res) {
             avatar: `https://graph.facebook.com/v19.0/${customerId}/picture?type=square`,
             lastMessage: snippet,
             lastMessageSender:
-              lastSyncedMessage?.sender || (unreadCount > 0 ? "customer" : "shop"),
+              lastSyncedMessage?.sender || (effectiveUnreadCount > 0 ? "customer" : "shop"),
             timestamp: updatedTime,
-            unreadCount,
+            unreadCount: effectiveUnreadCount,
             chatHistory: normalizedChatHistory,
           },
           { upsert: true, new: true }

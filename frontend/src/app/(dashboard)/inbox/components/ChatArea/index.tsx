@@ -700,7 +700,10 @@ export default function ChatArea({
     if (!customer) return;
 
     const nextUnreadCount = hasUnreadMessages ? 0 : 1;
-    onUpdateCustomerDetails(customer.id, { unreadCount: nextUnreadCount });
+    onUpdateCustomerDetails(customer.id, {
+      unreadCount: nextUnreadCount,
+      lastReadAt: nextUnreadCount === 0 ? new Date().toISOString() : null,
+    });
     message.success(nextUnreadCount > 0 ? "Đã đánh dấu chưa đọc" : "Đã đánh dấu đã đọc");
   };
 

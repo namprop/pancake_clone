@@ -723,10 +723,20 @@ export function AppProvider({ user, children }: AppProviderProps) {
   );
 
   const handleSelectCustomer = useCallback((id: string) => {
+    const lastReadAt = new Date().toISOString();
     setSelectedCustomerId(id);
     setCustomers((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0, lastReadAt } : c))
     );
+
+    fetch("/api/customers", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId: id,
+        fields: { unreadCount: 0, lastReadAt },
+      }),
+    }).catch((err) => console.error("Failed to mark conversation as read:", err));
   }, []);
 
   const handleCreateOrder = useCallback((order: Order) => {

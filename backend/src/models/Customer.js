@@ -49,6 +49,7 @@ const CustomerSchema = new Schema(
     lastMessage: { type: String, default: "" },
     timestamp: { type: Date, default: Date.now },
     unreadCount: { type: Number, default: 0 },
+    lastReadAt: { type: Date, default: null },
     lastMessageSender: {
       type: String,
       enum: ["customer", "shop", "system"],

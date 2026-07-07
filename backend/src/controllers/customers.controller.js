@@ -283,6 +283,7 @@ async function updateCustomer(req, res) {
       "isResolved",
       "resolvedAt",
       "unreadCount",
+      "lastReadAt",
     ]);
     const update = {};
 
